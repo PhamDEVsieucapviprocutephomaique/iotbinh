@@ -1,0 +1,41 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; // full màn hình
+
+  .header {
+    display: flex;
+    justify-content: flex-end;
+    gap: 20px;
+    padding: 14px 24px; // bé hơn chút
+    border-bottom: 1px solid #bbb;
+    background: #dcdcdc; // xám hơn so với #f8f8f8
+
+    a {
+      text-decoration: none;
+      color: #222;
+      font-size: 16px; // nhỏ hơn bản trước
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 4px;
+      transition: 0.3s;
+
+      &:hover {
+        background: #c8c8c8;
+      }
+
+      &.active {
+        background: #007bff;
+        color: #fff;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .body {
+    flex: 1;
+    padding: 20px;
+    background: #fff;
+    overflow-y: auto;
+  }
+}

@@ -1,0 +1,177 @@
+.action-history {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  height: 100vh;
+  box-sizing: border-box;
+
+  .date-row {
+    margin-bottom: 15px;
+    font-size: 16px;
+    font-weight: bold;
+  }
+
+  .filter-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+
+    .left-filters,
+    .right-filters {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      select,
+      input,
+      button {
+        padding: 8px 10px;
+        font-size: 14px;
+        border: 1px solid #aaa;
+        border-radius: 4px;
+      }
+
+      input::placeholder {
+        color: #aaa;
+        opacity: 0.7;
+      }
+
+      button {
+        background-color: #28a745;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+          background-color: darken(#28a745, 8%);
+        }
+      }
+    }
+  }
+
+  .table-wrapper {
+    height: 60%;
+    overflow: auto;
+  }
+
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #ddd;
+    font-size: 16px;
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 12px 15px;
+      text-align: center;
+    }
+
+    th {
+      background: #007bff;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    .copy-btn {
+      margin-left: 5px;
+      padding: 2px 6px;
+      font-size: 12px;
+      background: transparent; // nền trong suốt
+      color: #007bff; // chữ xanh da trời nhạt
+      border: 1px solid #007bff; // border xanh da trời nhạt
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        color: darken(#007bff, 10%);
+        border-color: darken(#007bff, 10%);
+      }
+    }
+  }
+
+  .pagination-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 15px;
+    gap: 10px;
+
+    button {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #ccc;
+      color: #333;
+      transition: background 0.2s;
+
+      &:hover:not(:disabled) {
+        background: #bbb;
+      }
+
+      &.active {
+        background: #007bff;
+        color: #fff;
+        font-weight: bold;
+      }
+
+      &:disabled {
+        background: #eee;
+        color: #999;
+        cursor: not-allowed;
+      }
+    }
+
+    .page-size-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+
+      input {
+        width: 50px;
+        padding: 4px 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        text-align: center;
+      }
+    }
+  }
+}
+
+// .// Xóa hiệu ứng focus cho tất cả input và select
+.filter-row {
+  input,
+  select {
+    &:focus {
+      outline: none !important;
+      box-shadow: none !important;
+      border-color: #ccc !important;
+    }
+
+    // Border cố định, không thay đổi
+    border: 1px solid #ccc !important;
+    transition: none !important;
+  }
+}
+
+// Đảm bảo disabled state cũng có border giống nhau
+
+.filter-row {
+  input,
+  select {
+    &:focus {
+      outline: none !important;
+      box-shadow: none !important;
+      border-color: #ccc !important;
+    }
+  }
+}
