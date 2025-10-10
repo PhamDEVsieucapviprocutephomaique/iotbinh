@@ -1,7 +1,8 @@
 import "../scss/Home.scss";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import ChartTemperature from "./Chart";
 import axios from "axios";
+
 const Home = () => {
   const [sensorData, setSensorData] = useState({
     temperature: 25,
@@ -9,7 +10,26 @@ const Home = () => {
     light: 99,
   });
 
-  // dodnaj này để lấy api giữ liệu sensor cuối cùng
+  const [deviceStates, setDeviceStates] = useState({
+    aircon: false,
+    light: false,
+    fan: false,
+  });
+
+  const [loadingStates, setLoadingStates] = useState({
+    aircon: false,
+    light: false,
+    fan: false,
+  });
+
+  // Ref để theo dõi trạng thái đang chờ SSE
+  const pendingStatesRef = useRef({
+    aircon: null,
+    light: null,
+    fan: null,
+  });
+
+  // ✅ 1. Lấy dữ liệu sensor cuối cùng
   const lastestdatasensor = async () => {
     try {
       const response = await fetch(
@@ -26,39 +46,88 @@ const Home = () => {
     }
   };
 
-  const getInitialControls = () => {
-    const savedControls = localStorage.getItem("homeControls");
-    if (savedControls) {
-      return JSON.parse(savedControls);
+  // ✅ 2. Lấy trạng thái ban đầu của devices khi web load
+  const fetchInitialDeviceStates = async () => {
+    try {
+      const deviceMap = {
+        aircon: "device1",
+        light: "device2",
+        fan: "device3",
+      };
+
+      const newDeviceStates = {};
+      const newLoadingStates = {};
+
+      for (const [device, apiDevice] of Object.entries(deviceMap)) {
+        const response = await fetch(
+          `http://127.0.0.1:8000/api/historyaction/laster/${apiDevice}`
+        );
+        const data = await response.json();
+        const apiValue = data[apiDevice];
+
+        newDeviceStates[device] = apiValue === "on";
+        newLoadingStates[device] = apiValue === "on";
+      }
+
+      setDeviceStates(newDeviceStates);
+      setLoadingStates(newLoadingStates);
+      console.log("Initial device states:", newDeviceStates);
+    } catch (error) {
+      console.error("Error fetching initial device states:", error);
     }
-    return {
-      aircon: false,
-      light: false,
-      fan: false,
-    };
   };
 
-  const [controls, setControls] = useState(getInitialControls);
-
-  // Lưu vào localStorage mỗi khi controls thay đổi
+  // ✅ 3. Kết nối SSE để nhận realtime update từ backend
   useEffect(() => {
-    localStorage.setItem("homeControls", JSON.stringify(controls));
-  }, [controls]);
+    const eventSource = new EventSource(
+      "http://127.0.0.1:8000/api/device/stream/"
+    );
 
-  useEffect(() => {
-    lastestdatasensor();
-    const intervalId = setInterval(lastestdatasensor, 5000);
+    eventSource.onopen = () => {
+      console.log("✅ SSE Connected");
+    };
 
-    const savedControls = localStorage.getItem("homeControls");
-    if (savedControls) {
-      setControls(JSON.parse(savedControls));
-    }
+    eventSource.onmessage = (event) => {
+      console.log("📡 Received SSE data:", event.data);
+
+      const data = JSON.parse(event.data);
+      console.log("📡 Parsed data:", data);
+
+      const deviceMap = {
+        device1: "aircon",
+        device2: "light",
+        device3: "fan",
+      };
+
+      const device = deviceMap[data.device];
+      const isOn = data.action === "on";
+
+      if (device) {
+        // Kiểm tra xem có đang chờ trạng thái này không
+        const isPendingState = pendingStatesRef.current[device] === isOn;
+
+        if (isPendingState) {
+          console.log(`✅ ${device} đã ${isOn ? "bật" : "tắt"} THÀNH CÔNG`);
+          // Xóa trạng thái chờ
+          pendingStatesRef.current[device] = null;
+        }
+
+        // Cập nhật UI với trạng thái thực tế từ backend
+        setDeviceStates((prev) => ({ ...prev, [device]: isOn }));
+        setLoadingStates((prev) => ({ ...prev, [device]: isOn }));
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("❌ SSE Error:", error);
+    };
+
+    return () => {
+      eventSource.close();
+    };
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("homeControls", JSON.stringify(controls));
-  }, [controls]);
-  // fix đoạn này để post lệnh bật tắt đèn cho backend
+  // ✅ 4. Handle toggle - CHỈ GỬI LỆNH, KHÔNG THAY ĐỔI UI CHO ĐẾN KHI CÓ SSE
   const toggleControl = useCallback(
     async (controlName) => {
       const deviceMap = {
@@ -67,15 +136,16 @@ const Home = () => {
         fan: "device3",
       };
 
-      const newState = !controls[controlName];
+      const newState = !deviceStates[controlName];
 
-      setControls((prev) => ({
-        ...prev,
-        [controlName]: newState,
-      }));
+      // QUAN TRỌNG: KHÔNG thay đổi loadingStates ở đây
+      // Giữ nguyên trạng thái hiện tại cho đến khi nhận được SSE
+
+      // Lưu trạng thái đang chờ vào ref
+      pendingStatesRef.current[controlName] = newState;
 
       const postData = {
-        [`${deviceMap[controlName]}`]: newState ? "on" : "off",
+        [deviceMap[controlName]]: newState ? "on" : "off",
       };
 
       try {
@@ -88,17 +158,29 @@ const Home = () => {
             },
           }
         );
-        // console.log("Device control successful:", response.data);
+        console.log("Device control command sent:", response.data);
+
+        // KHÔNG cập nhật deviceStates và loadingStates ở đây - ĐỢI SSE XÁC NHẬN
       } catch (error) {
         console.error("Error controlling device:", error);
-        setControls((prev) => ({
-          ...prev,
-          [controlName]: !newState,
-        }));
+        // Nếu có lỗi, xóa trạng thái chờ
+        pendingStatesRef.current[controlName] = null;
       }
     },
-    [controls]
+    [deviceStates]
   );
+
+  // ✅ 5. Fetch dữ liệu ban đầu
+  useEffect(() => {
+    lastestdatasensor();
+    fetchInitialDeviceStates();
+
+    const intervalId = setInterval(lastestdatasensor, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
 
   const getCurrentDate = () => {
     const now = new Date();
@@ -167,45 +249,54 @@ const Home = () => {
           <ChartTemperature />
         </div>
         <div className="controls-col">
+          {/* Điều hòa */}
           <div className="switch-container">
             <div className="control-info">
-              <span className={`icon ${controls.aircon ? "active" : ""}`}>
+              <span className={`icon ${loadingStates.aircon ? "active" : ""}`}>
                 ❄️
               </span>
               <span className="control-text">
-                {controls.aircon ? "ON" : "OFF"}
+                {loadingStates.aircon ? "ON" : "OFF"}
               </span>
             </div>
             <div className="switch" onClick={() => toggleControl("aircon")}>
-              <div className={`slider ${controls.aircon ? "on" : "off"}`}></div>
+              <div
+                className={`slider ${loadingStates.aircon ? "on" : "off"}`}
+              ></div>
             </div>
           </div>
 
+          {/* Đèn */}
           <div className="switch-container">
             <div className="control-info">
-              <span className={`icon ${controls.light ? "active" : ""}`}>
+              <span className={`icon ${loadingStates.light ? "active" : ""}`}>
                 💡
               </span>
               <span className="control-text">
-                {controls.light ? "ON" : "OFF"}
+                {loadingStates.light ? "ON" : "OFF"}
               </span>
             </div>
             <div className="switch" onClick={() => toggleControl("light")}>
-              <div className={`slider ${controls.light ? "on" : "off"}`}></div>
+              <div
+                className={`slider ${loadingStates.light ? "on" : "off"}`}
+              ></div>
             </div>
           </div>
 
+          {/* Quạt */}
           <div className="switch-container">
             <div className="control-info">
-              <span className={`icon ${controls.fan ? "active" : ""}`}>
-                <FanIcon isActive={controls.fan} />
+              <span className={`icon ${loadingStates.fan ? "active" : ""}`}>
+                <FanIcon isActive={loadingStates.fan} />
               </span>
               <span className="control-text">
-                {controls.fan ? "ON" : "OFF"}
+                {loadingStates.fan ? "ON" : "OFF"}
               </span>
             </div>
             <div className="switch" onClick={() => toggleControl("fan")}>
-              <div className={`slider ${controls.fan ? "on" : "off"}`}></div>
+              <div
+                className={`slider ${loadingStates.fan ? "on" : "off"}`}
+              ></div>
             </div>
           </div>
         </div>
@@ -213,4 +304,5 @@ const Home = () => {
     </div>
   );
 };
+
 export default Home;
